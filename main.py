@@ -1,9 +1,11 @@
 import os
+import secrets
 from typing import List, Optional
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from telegram import Bot
 
@@ -11,11 +13,14 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+ADMIN_USERNAME = os.getenv("ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASS", "lavender123")
 
 if not BOT_TOKEN:
     raise ValueError("សូមពិនិត្យមើល BOT_TOKEN ក្នុង file .env ឬ Environment Variables!")
 
 bot = Bot(token=BOT_TOKEN)
+security = HTTPBasic()
 app = FastAPI(title="Lavender Store API", version="1.0.0")
 
 app.add_middleware(
@@ -25,6 +30,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ផ្ទៀងផ្ទាត់សិទ្ធិអ្នកគ្រប់គ្រង (Admin Authentication)
+def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(credentials.username, ADMIN_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="ឈ្មោះ ឬលេខសម្ងាត់មិនត្រឹមត្រូវ",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 # ទិន្នន័យទំនិញគ្រប់មុខសម្រាប់ Lavender Store
 PRODUCTS = [
@@ -72,6 +89,7 @@ PRODUCTS = [
     }
 ]
 
+# Schemas
 class OrderItem(BaseModel):
     product_name: str
     quantity: int
@@ -83,6 +101,14 @@ class OrderPayload(BaseModel):
     customer_id: Optional[int] = None
     customer_name: Optional[str] = "អតិថិជន"
     username: Optional[str] = ""
+
+class ProductSchema(BaseModel):
+    name: str
+    category: str
+    price: float
+    image: str
+
+# ----------------- Store Front Routes -----------------
 
 @app.get("/")
 def serve_home():
@@ -97,7 +123,6 @@ async def place_order(order: OrderPayload):
     if not order.items:
         raise HTTPException(status_code=400, detail="កន្ត្រកទំនិញទទេ!")
 
-    # រៀបចំទម្រង់អត្ថបទវិក្កយបត្រ
     items_text = "\n".join([
         f"• {item.product_name} x {item.quantity} = ${item.price * item.quantity:.2f}"
         for item in order.items
@@ -123,18 +148,41 @@ async def place_order(order: OrderPayload):
         f"បុគ្គលិករបស់យើងនឹងទាក់ទងមកអ្នកតាម Chat នេះក្នុងពេលបន្តិចទៀត។"
     )
 
-    # ១. ផ្ញើ Alert ទៅកាន់អ្នកលក់ (Admin)
     if ADMIN_CHAT_ID:
         try:
             await bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_message, parse_mode="Markdown")
         except Exception as e:
             print(f"Error sending message to admin: {e}")
 
-    # ២. ផ្ញើវិក្កយបត្រទៅកាន់អតិថិជនវិញ (ប្រសិនបើមាន Telegram ID)
     if order.customer_id:
         try:
             await bot.send_message(chat_id=order.customer_id, text=customer_message, parse_mode="Markdown")
         except Exception as e:
-            print(f"Customer hasn't started the bot or error: {e}")
+            print(f"Customer error: {e}")
 
     return {"status": "success", "message": "ការបញ្ជាទិញទទួលបានជោគជ័យ"}
+
+# ----------------- Admin Routes -----------------
+
+@app.get("/admin")
+def serve_admin(user: str = Depends(verify_admin)):
+    return FileResponse("admin.html")
+
+@app.post("/api/admin/products")
+def add_product(prod: ProductSchema, user: str = Depends(verify_admin)):
+    new_id = max([p["id"] for p in PRODUCTS], default=0) + 1
+    new_item = {
+        "id": new_id,
+        "name": prod.name,
+        "category": prod.category,
+        "price": prod.price,
+        "image": prod.image
+    }
+    PRODUCTS.append(new_item)
+    return {"status": "success", "product": new_item}
+
+@app.delete("/api/admin/products/{product_id}")
+def delete_product(product_id: int, user: str = Depends(verify_admin)):
+    global PRODUCTS
+    PRODUCTS = [p for p in PRODUCTS if p["id"] != product_id]
+    return {"status": "success", "message": "ទំនិញត្រូវបានលុបជោគជ័យ"}
