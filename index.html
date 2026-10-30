@@ -1,227 +1,297 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="km">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Telegram Shop</title>
-    <!-- Telegram Web App SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts: Kantumruy Pro សម្រាប់ភាសាខ្មែរ -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      body {
-        font-family: 'Kantumruy Pro', sans-serif;
-      }
-    </style>
-  </head>
-  <body class="bg-slate-100 text-slate-800 antialiased pb-24">
-    <!-- Header Section -->
-    <header
-      class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between"
-    >
-      <div>
-        <h1 class="text-lg font-bold text-slate-900 leading-tight">
-          ហាងទំនិញអនឡាញ
-        </h1>
-        <p id="user-greeting" class="text-xs text-slate-500">
-          ស្វាគមន៍មកកាន់ហាងយើងខ្ញុំ
-        </p>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lavender Store Mini App</title>
+  <!-- Telegram Web App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Google Kantumruy Pro -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Kantumruy Pro', sans-serif; -webkit-tap-highlight-color: transparent; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased pb-28">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-purple-100 px-4 py-3">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl">🌸</span>
+        <div>
+          <h1 class="text-base font-bold text-purple-900 leading-tight">Lavender Store</h1>
+          <p id="customer-name" class="text-xs text-purple-600 font-medium">ហាងទំនិញគ្រប់មុខ</p>
+        </div>
       </div>
-      <div
-        class="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-semibold"
-      >
-        <span>កន្ត្រក៖</span>
-        <span id="cart-count">0</span>
+      <button onclick="toggleCartModal()" class="relative bg-purple-50 text-purple-700 p-2 rounded-xl">
+        🛒
+        <span id="cart-badge" class="hidden absolute -top-1.5 -right-1.5 bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">0</span>
+      </button>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="mt-3">
+      <input 
+        id="search-input" 
+        type="text" 
+        placeholder="ស្វែងរកទំនិញ..." 
+        oninput="handleSearch()"
+        class="w-full bg-slate-100 text-sm rounded-xl px-3.5 py-2 outline-none border border-transparent focus:border-purple-300 focus:bg-white transition-all"
+      />
+    </div>
+
+    <!-- Category Filters -->
+    <div class="flex gap-2 overflow-x-auto no-scrollbar mt-3 pt-1">
+      <button onclick="filterCategory('all', this)" class="cat-btn px-3 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">ទាំងអស់</button>
+      <button onclick="filterCategory('beauty', this)" class="cat-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">សម្រស់</button>
+      <button onclick="filterCategory('fashion', this)" class="cat-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">សម្លៀកបំពាក់</button>
+      <button onclick="filterCategory('electronics', this)" class="cat-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">គ្រឿងអេឡិចត្រូនិក</button>
+    </div>
+  </header>
+
+  <!-- Product Grid -->
+  <main class="max-w-md mx-auto p-4">
+    <div id="loading" class="text-center py-16 text-purple-400 text-sm">
+      <div class="inline-block animate-spin text-xl mb-2">🌸</div>
+      <p>កំពុងទាញយកទំនិញពី Lavender Store...</p>
+    </div>
+    <div id="product-grid" class="grid grid-cols-2 gap-3.5 hidden"></div>
+  </main>
+
+  <!-- Cart Modal / Bottom Sheet -->
+  <div id="cart-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-30 hidden transition-opacity">
+    <div class="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl max-h-[75vh] flex flex-col p-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h2 class="text-base font-bold text-slate-800">កន្ត្រកទំនិញរបស់អ្នក</h2>
+        <button onclick="toggleCartModal()" class="text-slate-400 hover:text-slate-600 text-sm font-semibold">✕ បិទ</button>
       </div>
-    </header>
-
-    <!-- Product Grid Container -->
-    <main class="max-w-md mx-auto p-4">
-      <div id="loading" class="text-center py-12 text-slate-400 text-sm">
-        កំពុងទាញយកបញ្ជីទំនិញ...
+      <div id="cart-items-container" class="overflow-y-auto py-3 space-y-3 flex-grow">
+        <!-- Rendered by JS -->
       </div>
-
-      <div id="product-grid" class="grid grid-cols-2 gap-3.5 hidden">
-        <!-- Cards នឹងត្រូវ Render តាម JavaScript -->
+      <div class="pt-3 border-t border-slate-100">
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-sm font-medium text-slate-500">សរុបទឹកប្រាក់៖</span>
+          <span id="modal-total" class="text-lg font-bold text-purple-700">$0.00</span>
+        </div>
+        <button onclick="triggerCheckout()" class="w-full bg-purple-600 text-white py-3 rounded-2xl font-bold text-sm shadow-lg shadow-purple-200 active:scale-[0.99] transition-transform">
+          បញ្ជាក់ការកុម្ម៉ង់ទិញ
+        </button>
       </div>
-    </main>
+    </div>
+  </div>
 
-    <script>
-      // ១. កំណត់ Telegram WebApp
-      const tg = window.Telegram?.WebApp;
-      if (tg) {
-        tg.ready();
-        tg.expand(); // ពង្រីកពេញអេក្រង់ទូរស័ព្ទ
+  <script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.initDataUnsafe?.user?.first_name) {
+        document.getElementById('customer-name').textContent = `សួស្ដី, ${tg.initDataUnsafe.user.first_name}!`;
+      }
+    }
 
-        // បង្ហាញឈ្មោះអ្នកប្រើប្រាស់ Telegram
-        if (tg.initDataUnsafe?.user?.first_name) {
-          document.getElementById('user-greeting').textContent =
-            `សួស្ដី, ${tg.initDataUnsafe.user.first_name}!`;
-        }
+    let allProducts = [];
+    let currentCategory = 'all';
+    let searchQuery = '';
+    const cart = {};
+
+    // Fetch Products
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => {
+        allProducts = data;
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('product-grid').classList.remove('hidden');
+        renderProducts();
+      })
+      .catch(() => {
+        document.getElementById('loading').innerHTML = '<p class="text-red-500">មិនអាចទាញយកទិន្នន័យបានទេ!</p>';
+      });
+
+    function renderProducts() {
+      const grid = document.getElementById('product-grid');
+      const filtered = allProducts.filter(p => {
+        const matchesCat = currentCategory === 'all' || p.category === currentCategory;
+        const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCat && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div class="col-span-2 text-center py-10 text-slate-400 text-xs">រកមិនឃើញទំនិញដែលអ្នកចង់បានឡើយ</div>';
+        return;
       }
 
-      // ២. State គ្រប់គ្រងកន្ត្រកទំនិញ (Cart)
-      const cart = {};
-
-      function updateCartUI() {
-        const totalItems = Object.values(cart).reduce(
-          (sum, qty) => sum + qty,
-          0,
-        );
-        const totalPrice = Object.entries(cart).reduce((sum, [id, qty]) => {
-          const prod = window.allProducts.find((p) => p.id === parseInt(id));
-          return sum + (prod ? prod.price * qty : 0);
-        }, 0);
-
-        document.getElementById('cart-count').textContent = totalItems;
-
-        // ប្រើ Telegram MainButton (ប៊ូតុងធំនៅបាតក្រោមអេក្រង់ Telegram)
-        if (tg && tg.MainButton) {
-          if (totalItems > 0) {
-            tg.MainButton.setText(
-              `បញ្ជាទិញ (${totalItems}) • $${totalPrice.toFixed(2)}`,
-            );
-            tg.MainButton.show();
-          } else {
-            tg.MainButton.hide();
-          }
-        }
-      }
-
-      // ៣. Handle ចុចទិញ
-      function addToCart(productId) {
-        cart[productId] = (cart[productId] || 0) + 1;
-        updateCartUI();
-        if (tg?.HapticFeedback) {
-          tg.HapticFeedback.impactOccurred('light'); // រំញ័រទូរស័ព្ទតិចៗពេលចុច
-        }
-      }
-
-      // ៤. ទាញទិន្នន័យពី FastAPI Backend
-      const API_URL = 'http://127.0.0.1:8000/api/products';
-
-      fetch(API_URL)
-        .then((res) => res.json())
-        .then((products) => {
-          window.allProducts = products;
-          const grid = document.getElementById('product-grid');
-          const loading = document.getElementById('loading');
-
-          grid.innerHTML = products
-            .map(
-              (product) => `
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col justify-between">
-            <div class="relative bg-slate-50 pt-[100%] overflow-hidden">
-              <img 
-                src="${product.image}" 
-                alt="${product.name}" 
-                class="absolute inset-0 w-full h-full object-cover p-2 hover:scale-105 transition-transform duration-300"
-              />
+      grid.innerHTML = filtered.map(p => `
+        <div class="bg-white rounded-2xl border border-purple-50 shadow-sm overflow-hidden flex flex-col justify-between">
+          <div class="relative pt-[100%] bg-slate-100">
+            <img src="${p.image}" alt="${p.name}" class="absolute inset-0 w-full h-full object-cover"/>
+          </div>
+          <div class="p-3 flex flex-col flex-grow justify-between gap-2">
+            <div>
+              <h3 class="font-semibold text-slate-800 text-xs line-clamp-2">${p.name}</h3>
+              <p class="text-purple-600 font-bold text-sm mt-1">$${p.price.toFixed(2)}</p>
             </div>
-            <div class="p-3 flex flex-col flex-grow justify-between gap-2">
-              <div>
-                <h3 class="font-semibold text-slate-800 text-sm line-clamp-1">${product.name}</h3>
-                <p class="text-blue-600 font-bold text-base mt-0.5">$${product.price.toFixed(2)}</p>
-              </div>
-              <button 
-                onclick="addToCart(${product.id})"
-                class="w-full bg-slate-900 active:bg-blue-600 text-white text-xs font-semibold py-2 rounded-xl transition-colors duration-150 flex items-center justify-center gap-1"
-              >
-                <span>+ ដាក់ចូលកន្ត្រក</span>
-              </button>
+            <button onclick="addToCart(${p.id})" class="w-full bg-purple-50 active:bg-purple-600 text-purple-700 active:text-white py-1.5 rounded-xl text-xs font-semibold transition-all">
+              + ដាក់ចូលកន្ត្រក
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addToCart(id) {
+      cart[id] = (cart[id] || 0) + 1;
+      updateCartState();
+      tg?.HapticFeedback?.impactOccurred('light');
+    }
+
+    function changeQuantity(id, delta) {
+      if (!cart[id]) return;
+      cart[id] += delta;
+      if (cart[id] <= 0) delete cart[id];
+      updateCartState();
+      renderCartModal();
+    }
+
+    function updateCartState() {
+      const totalCount = Object.values(cart).reduce((a, b) => a + b, 0);
+      const totalPrice = Object.entries(cart).reduce((sum, [id, qty]) => {
+        const p = allProducts.find(item => item.id === parseInt(id));
+        return sum + (p ? p.price * qty : 0);
+      }, 0);
+
+      const badge = document.getElementById('cart-badge');
+      if (totalCount > 0) {
+        badge.textContent = totalCount;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+
+      // Telegram MainButton Integration
+      if (tg?.MainButton) {
+        if (totalCount > 0) {
+          tg.MainButton.setText(`មើលកន្ត្រក (${totalCount}) • $${totalPrice.toFixed(2)}`);
+          tg.MainButton.show();
+        } else {
+          tg.MainButton.hide();
+        }
+      }
+    }
+
+    function toggleCartModal() {
+      const modal = document.getElementById('cart-modal');
+      const isHidden = modal.classList.contains('hidden');
+      if (isHidden) {
+        renderCartModal();
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function renderCartModal() {
+      const container = document.getElementById('cart-items-container');
+      const totalEl = document.getElementById('modal-total');
+      const entries = Object.entries(cart);
+
+      if (entries.length === 0) {
+        container.innerHTML = '<p class="text-center py-6 text-slate-400 text-xs">កន្ត្រករបស់អ្នកទទេស្អាត</p>';
+        totalEl.textContent = '$0.00';
+        return;
+      }
+
+      let total = 0;
+      container.innerHTML = entries.map(([id, qty]) => {
+        const p = allProducts.find(item => item.id === parseInt(id));
+        const subtotal = p.price * qty;
+        total += subtotal;
+        return `
+          <div class="flex items-center justify-between text-xs bg-slate-50 p-2.5 rounded-xl">
+            <div class="flex-grow pr-2">
+              <p class="font-semibold text-slate-800 line-clamp-1">${p.name}</p>
+              <p class="text-purple-600 font-bold">$${p.price.toFixed(2)}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="changeQuantity(${p.id}, -1)" class="w-6 h-6 rounded-lg bg-white border border-slate-200 font-bold">-</button>
+              <span class="font-bold text-slate-700">${qty}</span>
+              <button onclick="changeQuantity(${p.id}, 1)" class="w-6 h-6 rounded-lg bg-white border border-slate-200 font-bold">+</button>
             </div>
           </div>
-        `,
-            )
-            .join('');
-
-          loading.classList.add('hidden');
-          grid.classList.remove('hidden');
-        })
-        .catch((err) => {
-          document.getElementById('loading').innerHTML = `
-          <p class="text-red-500">មិនអាចទាញទិន្នន័យបានទេ!</p>
-          <p class="text-xs text-slate-400 mt-1">សូមប្រាកដថា FastAPI កំពុងដំណើរការលើ Port 8000</p>
         `;
+      }).join('');
+      totalEl.textContent = `$${total.toFixed(2)}`;
+    }
+
+    async function triggerCheckout() {
+      const items = Object.entries(cart).map(([id, qty]) => {
+        const prod = allProducts.find(p => p.id === parseInt(id));
+        return { product_name: prod.name, quantity: qty, price: prod.price };
+      });
+      if (items.length === 0) return;
+
+      const totalPrice = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      const user = tg?.initDataUnsafe?.user;
+
+      tg?.MainButton?.showProgress();
+
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: items,
+            total_amount: totalPrice,
+            customer_id: user?.id || null,
+            customer_name: user?.first_name || "Guest User",
+            username: user?.username || ""
+          })
         });
 
-      // កូដពេលចុចប៊ូតុង MainButton របស់ Telegram នៅបាតក្រោម
-      if (tg?.MainButton) {
-        tg.MainButton.onClick(async () => {
-          const totalItems = Object.values(cart).reduce(
-            (sum, qty) => sum + qty,
-            0,
-          );
-          if (totalItems === 0) return;
-
-          tg.showConfirm(
-            'តើអ្នកពិតជាចង់បញ្ជាទិញទំនិញទាំងនេះមែនទេ?',
-            async (confirmed) => {
-              if (!confirmed) return;
-
-              // បង្ហាញ Loading លើប៊ូតុង
-              tg.MainButton.showProgress();
-
-              // រៀបចំទិន្នន័យបញ្ជូនទៅ API
-              const items = Object.entries(cart).map(([id, qty]) => {
-                const prod = window.allProducts.find(
-                  (p) => p.id === parseInt(id),
-                );
-                return {
-                  product_name: prod.name,
-                  quantity: qty,
-                  price: prod.price,
-                };
-              });
-
-              const totalPrice = items.reduce(
-                (sum, i) => sum + i.price * i.quantity,
-                0,
-              );
-              const customerName =
-                tg.initDataUnsafe?.user?.first_name || 'អតិថិជន';
-
-              try {
-                const response = await fetch('/api/orders', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    items: items,
-                    total_amount: totalPrice,
-                    customer_name: customerName,
-                  }),
-                });
-
-                if (response.ok) {
-                  tg.HapticFeedback?.notificationOccurred('success');
-                  tg.showAlert('ការបញ្ជាទិញទទួលបានជោគជ័យ! សូមអរគុណ។', () => {
-                    tg.close(); // បិទ Mini App ត្រឡប់ទៅផ្ទាំង Chat វិញ
-                  });
-                } else {
-                  const err = await response.json();
-                  tg.showAlert(
-                    'មានបញ្ហាក្នុងការបញ្ជាទិញ៖ ' +
-                      (err.detail || 'សូមព្យាយាមម្តងទៀត'),
-                  );
-                }
-              } catch (error) {
-                tg.showAlert('បរាជ័យក្នុងការភ្ជាប់ទៅកាន់ Server!');
-              } finally {
-                tg.MainButton.hideProgress();
-              }
-            },
-          );
-        });
+        if (res.ok) {
+          tg?.HapticFeedback?.notificationOccurred('success');
+          toggleCartModal();
+          // សម្អាតកន្ត្រក
+          for (const key in cart) delete cart[key];
+          updateCartState();
+          
+          tg?.showAlert("ការបញ្ជាទិញទទួលបានជោគជ័យ! យើងខ្ញុំបានផ្ញើវិក្កយបត្រទៅកាន់ Telegram របស់អ្នកហើយ។", () => {
+            tg?.close();
+          });
+        } else {
+          tg?.showAlert("មានបញ្ហាក្នុងការបញ្ជាទិញ សូមព្យាយាមម្ដងទៀត!");
+        }
+      } catch (err) {
+        tg?.showAlert("មិនអាចភ្ជាប់ទៅកាន់ Server បានទេ!");
+      } finally {
+        tg?.MainButton?.hideProgress();
       }
-    </script>
-  </body>
+    }
+
+    if (tg?.MainButton) {
+      tg.MainButton.onClick(() => toggleCartModal());
+    }
+
+    function filterCategory(cat, btn) {
+      currentCategory = cat;
+      document.querySelectorAll('.cat-btn').forEach(b => {
+        b.className = 'cat-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600';
+      });
+      btn.className = 'cat-btn px-3 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white';
+      renderProducts();
+    }
+
+    function handleSearch() {
+      searchQuery = document.getElementById('search-input').value;
+      renderProducts();
+    }
+  </script>
+</body>
 </html>
