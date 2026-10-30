@@ -1,104 +1,122 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="km">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telegram Shop</title>
-  <!-- Telegram Web App SDK -->
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts: Kantumruy Pro សម្រាប់ភាសាខ្មែរ -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Kantumruy Pro', sans-serif;
-    }
-  </style>
-</head>
-<body class="bg-slate-100 text-slate-800 antialiased pb-24">
-
-  <!-- Header Section -->
-  <header class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-    <div>
-      <h1 class="text-lg font-bold text-slate-900 leading-tight">ហាងទំនិញអនឡាញ</h1>
-      <p id="user-greeting" class="text-xs text-slate-500">ស្វាគមន៍មកកាន់ហាងយើងខ្ញុំ</p>
-    </div>
-    <div class="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-semibold">
-      <span>កន្ត្រក៖</span>
-      <span id="cart-count">0</span>
-    </div>
-  </header>
-
-  <!-- Product Grid Container -->
-  <main class="max-w-md mx-auto p-4">
-    <div id="loading" class="text-center py-12 text-slate-400 text-sm">
-      កំពុងទាញយកបញ្ជីទំនិញ...
-    </div>
-
-    <div id="product-grid" class="grid grid-cols-2 gap-3.5 hidden">
-      <!-- Cards នឹងត្រូវ Render តាម JavaScript -->
-    </div>
-  </main>
-
-  <script>
-    // ១. កំណត់ Telegram WebApp
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand(); // ពង្រីកពេញអេក្រង់ទូរស័ព្ទ
-
-      // បង្ហាញឈ្មោះអ្នកប្រើប្រាស់ Telegram
-      if (tg.initDataUnsafe?.user?.first_name) {
-        document.getElementById('user-greeting').textContent = `សួស្ដី, ${tg.initDataUnsafe.user.first_name}!`;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Telegram Shop</title>
+    <!-- Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Kantumruy Pro សម្រាប់ភាសាខ្មែរ -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: 'Kantumruy Pro', sans-serif;
       }
-    }
+    </style>
+  </head>
+  <body class="bg-slate-100 text-slate-800 antialiased pb-24">
+    <!-- Header Section -->
+    <header
+      class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between"
+    >
+      <div>
+        <h1 class="text-lg font-bold text-slate-900 leading-tight">
+          ហាងទំនិញអនឡាញ
+        </h1>
+        <p id="user-greeting" class="text-xs text-slate-500">
+          ស្វាគមន៍មកកាន់ហាងយើងខ្ញុំ
+        </p>
+      </div>
+      <div
+        class="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-semibold"
+      >
+        <span>កន្ត្រក៖</span>
+        <span id="cart-count">0</span>
+      </div>
+    </header>
 
-    // ២. State គ្រប់គ្រងកន្ត្រកទំនិញ (Cart)
-    const cart = {};
+    <!-- Product Grid Container -->
+    <main class="max-w-md mx-auto p-4">
+      <div id="loading" class="text-center py-12 text-slate-400 text-sm">
+        កំពុងទាញយកបញ្ជីទំនិញ...
+      </div>
 
-    function updateCartUI() {
-      const totalItems = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
-      const totalPrice = Object.entries(cart).reduce((sum, [id, qty]) => {
-        const prod = window.allProducts.find(p => p.id === parseInt(id));
-        return sum + (prod ? prod.price * qty : 0);
-      }, 0);
+      <div id="product-grid" class="grid grid-cols-2 gap-3.5 hidden">
+        <!-- Cards នឹងត្រូវ Render តាម JavaScript -->
+      </div>
+    </main>
 
-      document.getElementById('cart-count').textContent = totalItems;
+    <script>
+      // ១. កំណត់ Telegram WebApp
+      const tg = window.Telegram?.WebApp;
+      if (tg) {
+        tg.ready();
+        tg.expand(); // ពង្រីកពេញអេក្រង់ទូរស័ព្ទ
 
-      // ប្រើ Telegram MainButton (ប៊ូតុងធំនៅបាតក្រោមអេក្រង់ Telegram)
-      if (tg && tg.MainButton) {
-        if (totalItems > 0) {
-          tg.MainButton.setText(`បញ្ជាទិញ (${totalItems}) • $${totalPrice.toFixed(2)}`);
-          tg.MainButton.show();
-        } else {
-          tg.MainButton.hide();
+        // បង្ហាញឈ្មោះអ្នកប្រើប្រាស់ Telegram
+        if (tg.initDataUnsafe?.user?.first_name) {
+          document.getElementById('user-greeting').textContent =
+            `សួស្ដី, ${tg.initDataUnsafe.user.first_name}!`;
         }
       }
-    }
 
-    // ៣. Handle ចុចទិញ
-    function addToCart(productId) {
-      cart[productId] = (cart[productId] || 0) + 1;
-      updateCartUI();
-      if (tg?.HapticFeedback) {
-        tg.HapticFeedback.impactOccurred('light'); // រំញ័រទូរស័ព្ទតិចៗពេលចុច
+      // ២. State គ្រប់គ្រងកន្ត្រកទំនិញ (Cart)
+      const cart = {};
+
+      function updateCartUI() {
+        const totalItems = Object.values(cart).reduce(
+          (sum, qty) => sum + qty,
+          0,
+        );
+        const totalPrice = Object.entries(cart).reduce((sum, [id, qty]) => {
+          const prod = window.allProducts.find((p) => p.id === parseInt(id));
+          return sum + (prod ? prod.price * qty : 0);
+        }, 0);
+
+        document.getElementById('cart-count').textContent = totalItems;
+
+        // ប្រើ Telegram MainButton (ប៊ូតុងធំនៅបាតក្រោមអេក្រង់ Telegram)
+        if (tg && tg.MainButton) {
+          if (totalItems > 0) {
+            tg.MainButton.setText(
+              `បញ្ជាទិញ (${totalItems}) • $${totalPrice.toFixed(2)}`,
+            );
+            tg.MainButton.show();
+          } else {
+            tg.MainButton.hide();
+          }
+        }
       }
-    }
 
-    // ៤. ទាញទិន្នន័យពី FastAPI Backend
-    const API_URL = 'http://127.0.0.1:8000/api/products';
+      // ៣. Handle ចុចទិញ
+      function addToCart(productId) {
+        cart[productId] = (cart[productId] || 0) + 1;
+        updateCartUI();
+        if (tg?.HapticFeedback) {
+          tg.HapticFeedback.impactOccurred('light'); // រំញ័រទូរស័ព្ទតិចៗពេលចុច
+        }
+      }
 
-    fetch(API_URL)
-      .then(res => res.json())
-      .then(products => {
-        window.allProducts = products;
-        const grid = document.getElementById('product-grid');
-        const loading = document.getElementById('loading');
+      // ៤. ទាញទិន្នន័យពី FastAPI Backend
+      const API_URL = 'http://127.0.0.1:8000/api/products';
 
-        grid.innerHTML = products.map(product => `
+      fetch(API_URL)
+        .then((res) => res.json())
+        .then((products) => {
+          window.allProducts = products;
+          const grid = document.getElementById('product-grid');
+          const loading = document.getElementById('loading');
+
+          grid.innerHTML = products
+            .map(
+              (product) => `
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col justify-between">
             <div class="relative bg-slate-50 pt-[100%] overflow-hidden">
               <img 
@@ -120,29 +138,90 @@
               </button>
             </div>
           </div>
-        `).join('');
+        `,
+            )
+            .join('');
 
-        loading.classList.add('hidden');
-        grid.classList.remove('hidden');
-      })
-      .catch(err => {
-        document.getElementById('loading').innerHTML = `
+          loading.classList.add('hidden');
+          grid.classList.remove('hidden');
+        })
+        .catch((err) => {
+          document.getElementById('loading').innerHTML = `
           <p class="text-red-500">មិនអាចទាញទិន្នន័យបានទេ!</p>
           <p class="text-xs text-slate-400 mt-1">សូមប្រាកដថា FastAPI កំពុងដំណើរការលើ Port 8000</p>
         `;
-      });
-
-    // ៥. Event ពេលចុចលើ Telegram MainButton
-    if (tg?.MainButton) {
-      tg.MainButton.onClick(() => {
-        tg.showConfirm("តើអ្នកពិតជាចង់បញ្ជាទិញទំនិញទាំងនេះមែនទេ?", (confirmed) => {
-          if (confirmed) {
-            // កន្លែងផ្ញើ Order ទៅកាន់ Backend
-            tg.showAlert("ការបញ្ជាទិញរបស់អ្នកត្រូវបានកត់ត្រាទុក!");
-          }
         });
-      });
-    }
-  </script>
-</body>
+
+      // កូដពេលចុចប៊ូតុង MainButton របស់ Telegram នៅបាតក្រោម
+      if (tg?.MainButton) {
+        tg.MainButton.onClick(async () => {
+          const totalItems = Object.values(cart).reduce(
+            (sum, qty) => sum + qty,
+            0,
+          );
+          if (totalItems === 0) return;
+
+          tg.showConfirm(
+            'តើអ្នកពិតជាចង់បញ្ជាទិញទំនិញទាំងនេះមែនទេ?',
+            async (confirmed) => {
+              if (!confirmed) return;
+
+              // បង្ហាញ Loading លើប៊ូតុង
+              tg.MainButton.showProgress();
+
+              // រៀបចំទិន្នន័យបញ្ជូនទៅ API
+              const items = Object.entries(cart).map(([id, qty]) => {
+                const prod = window.allProducts.find(
+                  (p) => p.id === parseInt(id),
+                );
+                return {
+                  product_name: prod.name,
+                  quantity: qty,
+                  price: prod.price,
+                };
+              });
+
+              const totalPrice = items.reduce(
+                (sum, i) => sum + i.price * i.quantity,
+                0,
+              );
+              const customerName =
+                tg.initDataUnsafe?.user?.first_name || 'អតិថិជន';
+
+              try {
+                const response = await fetch('/api/orders', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    items: items,
+                    total_amount: totalPrice,
+                    customer_name: customerName,
+                  }),
+                });
+
+                if (response.ok) {
+                  tg.HapticFeedback?.notificationOccurred('success');
+                  tg.showAlert('ការបញ្ជាទិញទទួលបានជោគជ័យ! សូមអរគុណ។', () => {
+                    tg.close(); // បិទ Mini App ត្រឡប់ទៅផ្ទាំង Chat វិញ
+                  });
+                } else {
+                  const err = await response.json();
+                  tg.showAlert(
+                    'មានបញ្ហាក្នុងការបញ្ជាទិញ៖ ' +
+                      (err.detail || 'សូមព្យាយាមម្តងទៀត'),
+                  );
+                }
+              } catch (error) {
+                tg.showAlert('បរាជ័យក្នុងការភ្ជាប់ទៅកាន់ Server!');
+              } finally {
+                tg.MainButton.hideProgress();
+              }
+            },
+          );
+        });
+      }
+    </script>
+  </body>
 </html>
