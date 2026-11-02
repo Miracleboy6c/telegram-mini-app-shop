@@ -1,6 +1,9 @@
 import os
 import secrets
+import io
+import base64
 from typing import List, Optional
+from datetime import datetime
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.responses import FileResponse
@@ -8,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from telegram import Bot
+import qrcode
+from bakong_khqr import KHQR
 
 load_dotenv()
 
@@ -15,6 +20,11 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
 ADMIN_USERNAME = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASS", "lavender123")
+
+# ព័ត៌មានគណនីបាគង KHQR
+BAKONG_ACCOUNT_ID = os.getenv("BAKONG_ACCOUNT_ID", "your_bakong_id@bkng")
+MERCHANT_NAME = os.getenv("MERCHANT_NAME", "Lavender Store")
+MERCHANT_CITY = os.getenv("MERCHANT_CITY", "Phnom Penh")
 
 if not BOT_TOKEN:
     raise ValueError("សូមពិនិត្យមើល BOT_TOKEN ក្នុង file .env ឬ Environment Variables!")
@@ -89,6 +99,9 @@ PRODUCTS = [
     }
 ]
 
+# កន្លែងរក្សាទុកប្រវត្តិ Orders
+ORDERS_DB = []
+
 # Schemas
 class OrderItem(BaseModel):
     product_name: str
@@ -96,11 +109,18 @@ class OrderItem(BaseModel):
     price: float
 
 class OrderPayload(BaseModel):
+    order_id: Optional[str] = None
     items: List[OrderItem]
     total_amount: float
     customer_id: Optional[int] = None
     customer_name: Optional[str] = "អតិថិជន"
+    phone: Optional[str] = "មិនបានបញ្ជាក់"
+    address: Optional[str] = "មិនបានបញ្ជាក់"
     username: Optional[str] = ""
+
+class KHQRRequest(BaseModel):
+    amount: float
+    currency: str = "USD"
 
 class ProductSchema(BaseModel):
     name: str
@@ -118,10 +138,63 @@ def serve_home():
 def get_products():
     return PRODUCTS
 
+@app.post("/api/generate-khqr")
+def generate_khqr(req: KHQRRequest):
+    try:
+        # បង្កើត Dynamic KHQR String
+        khqr = KHQR()
+        qr_string = khqr.create_qr(
+            bank_account=BAKONG_ACCOUNT_ID,
+            merchant_name=MERCHANT_NAME,
+            merchant_city=MERCHANT_CITY,
+            amount=req.amount,
+            currency=req.currency,
+            store_label="Lavender Store",
+            terminal_label="MiniApp"
+        )
+        # បំប្លែងទៅជារូបភាព Base64
+        qr_img = qrcode.make(qr_string)
+        buffer = io.BytesIO()
+        qr_img.save(buffer, format="PNG")
+        qr_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        return {
+            "status": "success",
+            "qr_image": f"data:image/png;base64,{qr_base64}",
+            "amount": req.amount
+        }
+    except Exception as e:
+        # ប្រសិនបើមានបញ្ហា library khqr បង្កើត Fallback QR សាកល្បង
+        fallback_qr = qrcode.make(f"BAKONG:{BAKONG_ACCOUNT_ID}?amount={req.amount}")
+        buf = io.BytesIO()
+        fallback_qr.save(buf, format="PNG")
+        return {
+            "status": "success",
+            "qr_image": f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}",
+            "amount": req.amount
+        }
+
 @app.post("/api/orders")
 async def place_order(order: OrderPayload):
     if not order.items:
         raise HTTPException(status_code=400, detail="កន្ត្រកទំនិញទទេ!")
+
+    order_id = order.order_id or f"LV-{secrets.randbelow(900000) + 100000}"
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # រក្សាទុកក្នុង Orders DB
+    order_record = {
+        "order_id": order_id,
+        "items": [item.model_dump() for item in order.items],
+        "total_amount": order.total_amount,
+        "customer_id": order.customer_id,
+        "customer_name": order.customer_name,
+        "phone": order.phone,
+        "address": order.address,
+        "status": "បានទូទាត់ (KHQR)",
+        "created_at": created_at
+    }
+    ORDERS_DB.insert(0, order_record)
 
     items_text = "\n".join([
         f"• {item.product_name} x {item.quantity} = ${item.price * item.quantity:.2f}"
@@ -131,21 +204,25 @@ async def place_order(order: OrderPayload):
     admin_message = (
         f"🌸 *ការបញ្ជាទិញថ្មីពី Lavender Store!*\n"
         f"━━━━━━━━━━━━━━━━━━\n"
+        f"🧾 លេខវិក្កយបត្រ: `{order_id}`\n"
         f"👤 អ្នកទិញ: *{order.customer_name}* "
         f"{'(@' + order.username + ')' if order.username else ''}\n"
-        f"🆔 Telegram ID: `{order.customer_id}`\n\n"
+        f"📞 ទូរស័ព្ទ: `{order.phone}`\n"
+        f"📍 ទីតាំងដឹកជញ្ជូន: {order.address}\n\n"
         f"📦 *ទំនិញកុម្ម៉ង់:*\n{items_text}\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"💰 *ទឹកប្រាក់សរុប:* `${order.total_amount:.2f}`\n"
-        f"🕒 ស្ថានភាព: មិនទាន់ទូទាត់ប្រាក់"
+        f"💳 វិធីសាស្ត្រ: Bakong KHQR"
     )
 
     customer_message = (
         f"🌸 *អរគុណសម្រាប់ការបញ្ជាទិញនៅ Lavender Store!*\n\n"
-        f"សួស្ដី {order.customer_name} ការបញ្ជាទិញរបស់អ្នកត្រូវបានកត់ត្រាទុក៖\n\n"
+        f"សួស្ដី {order.customer_name} ការបញ្ជាទិញលេខ `{order_id}` របស់អ្នកទទួលបានជោគជ័យ៖\n\n"
         f"{items_text}\n\n"
-        f"💵 *ទឹកប្រាក់សរុប:* `${order.total_amount:.2f}`\n\n"
-        f"បុគ្គលិករបស់យើងនឹងទាក់ទងមកអ្នកតាម Chat នេះក្នុងពេលបន្តិចទៀត។"
+        f"💵 *ទឹកប្រាក់សរុប:* `${order.total_amount:.2f}`\n"
+        f"📍 ទីតាំងដឹកជញ្ជូន: {order.address}\n"
+        f"📞 ទូរស័ព្ទទំនាក់ទំនង: {order.phone}\n\n"
+        f"យើងខ្ញុំនឹងរៀបចំដឹកជញ្ជូនជូនលោកអ្នកឆាប់ៗនេះ!"
     )
 
     if ADMIN_CHAT_ID:
@@ -160,13 +237,23 @@ async def place_order(order: OrderPayload):
         except Exception as e:
             print(f"Customer error: {e}")
 
-    return {"status": "success", "message": "ការបញ្ជាទិញទទួលបានជោគជ័យ"}
+    return {"status": "success", "order_id": order_id, "message": "ការបញ្ជាទិញទទួលបានជោគជ័យ"}
+
+@app.get("/api/orders/user/{customer_id}")
+def get_user_orders(customer_id: int):
+    # ទាញយកប្រវត្តិ Orders របស់ User ជាក់លាក់
+    user_orders = [o for o in ORDERS_DB if o.get("customer_id") == customer_id]
+    return user_orders
 
 # ----------------- Admin Routes -----------------
 
 @app.get("/admin")
 def serve_admin(user: str = Depends(verify_admin)):
     return FileResponse("admin.html")
+
+@app.get("/api/admin/orders")
+def get_all_orders(user: str = Depends(verify_admin)):
+    return ORDERS_DB
 
 @app.post("/api/admin/products")
 def add_product(prod: ProductSchema, user: str = Depends(verify_admin)):
